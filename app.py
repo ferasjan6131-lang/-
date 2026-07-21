@@ -1,84 +1,104 @@
 import streamlit as st
 import pandas as pd
+import os
 from datetime import datetime
 
-# إعدادات الصفحة لتناسب الجوال والكمبيوتر
-st.set_page_config(page_title="نظام مصاريف المطعم المشترك", layout="centered", initial_sidebar_state="collapsed")
+# إعدادات الصفحة
+st.set_page_config(page_title="نظام المبيعات والمصاريف", layout="centered", initial_sidebar_state="collapsed")
 
-# 1. نظام حماية ودخول بسيط للموقع
+# اسم الملف الذي ستحفظ فيه البيانات تلقائياً
+DATA_FILE = "data.csv"
+
+# دالة لتحميل البيانات من الملف
+def load_data():
+    if os.path.exists(DATA_FILE):
+        return pd.read_csv(DATA_FILE)
+    else:
+        return pd.DataFrame(columns=['التاريخ والوقت', 'المسؤول', 'النوع', 'الوصف/الطلب', 'المبلغ (ريال)', 'طريقة الدفع', 'التصنيف'])
+
+# دالة لحفظ البيانات فوراً في الملف
+def save_data(df):
+    df.to_csv(DATA_FILE, index=False)
+
+# 1. تسجيل الدخول
 if 'authenticated' not in st.session_state:
     st.session_state.authenticated = False
 
 if not st.session_state.authenticated:
-    st.markdown("<h2 style='text-align: center;'>🔐 تسجيل الدخول للموقع</h2>", unsafe_allow_html=True)
-    username = st.text_input("اسم المستخدم (أنت أو أخوك)")
+    st.markdown("<h2 style='text-align: center;'>🔐 تسجيل الدخول</h2>", unsafe_allow_html=True)
+    username = st.text_input("اسم المستخدم")
     password = st.text_input("كلمة المرور", type="password")
-    login_btn = st.button("دخول", use_container_width=True)
-    
-    # يمكنك تغيير كلمة المرور هنا كما تحب
-    if login_btn:
-        if password == "0532660073" and username in ["عبدالمجيد", "فراس", "فارس"]: 
+    if st.button("دخول", use_container_width=True):
+        if password == "12345" and username.strip() != "فراس":
             st.session_state.authenticated = True
             st.session_state.user = username
             st.rerun()
         else:
-            st.error("اسم المستخدم أو كلمة المرور غير صحيحة!")
+            st.error("اكتب اسمك وكلمة المرور الصحيحة (12345)")
     st.stop()
 
-# 2. تهيئة قاعدة البيانات المحلية لحفظ الفواتير (في الجلسة الحالية)
-if 'restaurant_db' not in st.session_state:
-    st.session_state.restaurant_db = pd.DataFrame(columns=['التاريخ والوقت', 'المسؤول', 'الغرض', 'المبلغ (ريال)', 'النوع'])
+# تحميل البيانات الحالية
+df_data = load_data()
 
-# 3. واجهة الموقع بعد الدخول
-st.markdown(f"<h3 style='text-align: center;'>🏪 نظام مصاريف المطعم المشترك</h3>", unsafe_allow_html=True)
-st.markdown(f"<p style='text-align: center; color: green;'>مرحباً بك يا <b>{st.session_state.user}</b> | الآن يمكنك تسجيل أي مصروف فوراً</p>", unsafe_allow_html=True)
+st.markdown(f"<h3 style='text-align: center;'>🏪 نظام مبيعات ومصاريف المطعم</h3>", unsafe_allow_html=True)
+st.markdown(f"<p style='text-align: center; color: green;'>مرحباً <b>{st.session_state.user}</b> | الحفظ تلقائي ودائم 💾</p>", unsafe_allow_html=True)
 
-# استمارة إدخال المصاريف السريعة
-with st.form("expense_form", clear_on_submit=True):
-    st.markdown("#### 🛒 تسجيل غرض جديد")
-    item_name = st.text_input("ماذا اشتريت الآن؟", placeholder="مثال: كيس رز، طماطم، فاتورة كهرباء...")
-    amount = st.number_input("المبلغ المدفوع (ريال سعودي)", min_value=0.0, step=1.0, value=0.0)
-    category = st.selectbox("تصنيف المصروف", ["خضار وفواكه", "لحوم ودواجن", "مواد جافة", "فواتير وتشغيل", "أدوات سفري", "أخرى"])
-    
-    submit_btn = st.form_submit_button("🚀 حفظ المصروف الآن", use_container_width=True)
-    
+# 2. إدخال بيانات جديدة
+entry_type = st.radio("اختر نوع العملية:", ["💵 بيع (إيراد)", "🛒 مصروف (مشتريات/فواتير)"], horizontal=True)
+
+with st.form("entry_form", clear_on_submit=True):
+    if "بيع" in entry_type:
+        st.markdown("#### 💵 تسجيل عملية بيع")
+        item_desc = st.text_input("تفاصيل الطلب / الوجبة", placeholder="مثال: وجبة شواية + بيبسي")
+        amount = st.number_input("المبلغ (ريال)", min_value=0.0, step=1.0, value=0.0)
+        pay_method = st.selectbox("طريقة الدفع", ["شبكة / مدى", "كاش (نقدي)", "تطبيق توصيل", "آجل"])
+        category = st.selectbox("نوع الطلب", ["محلي", "سفري", "توصيل"])
+        record_type = "بيع"
+    else:
+        st.markdown("#### 🛒 تسجيل مصروف جديد")
+        item_desc = st.text_input("ماذا اشتريت؟", placeholder="مثال: خضار، فاتورة كهرباء")
+        amount = st.number_input("المبلغ المدفوع (ريال)", min_value=0.0, step=1.0, value=0.0)
+        pay_method = st.selectbox("طريقة الدفع", ["كاش (نقدي)", "شبكة / مدى", "آجل"])
+        category = st.selectbox("تصنيف المصروف", ["خضار وفواكه", "لحوم ودواجن", "مواد جافة", "فواتير وتشغيل", "أخرى"])
+        record_type = "مصروف"
+
+    submit_btn = st.form_submit_button("🚀 حفظ العملية تلقائياً", use_container_width=True)
+
     if submit_btn:
-        if item_name and amount > 0:
+        if item_desc and amount > 0:
             now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
-            # إضافة البيانات وتحديد من قام بالإدخال 
-            new_data = pd.DataFrame([[now_str, st.session_state.user, item_name, amount, category]], columns=st.session_state.restaurant_db.columns)
-            st.session_state.restaurant_db = pd.concat([new_data, st.session_state.restaurant_db], ignore_index=True)
-            st.success(f"تم حفظ '{item_name}' بنجاح بواسطة {st.session_state.user}!")
+            new_row = pd.DataFrame([[now_str, st.session_state.user, record_type, item_desc, amount, pay_method, category]], 
+                                   columns=['التاريخ والوقت', 'المسؤول', 'النوع', 'الوصف/الطلب', 'المبلغ (ريال)', 'طريقة الدفع', 'التصنيف'])
+            
+            updated_df = pd.concat([df_data, new_row], ignore_index=True)
+            save_data(updated_df) # حفظ تلقائي في الملف
+            st.success(f"تم حفظ {record_type} بمبلغ {amount:,.2f} ريال بنجاح ولن يختفي!")
+            st.rerun()
         else:
-            st.error("تأكد من كتابة اسم الغرض والمبلغ بشكل صحيح.")
+            st.error("يرجى إدخال تفاصيل الطلب والمبلغ الصحيح.")
 
 st.markdown("---")
 
-# 4. لوحة تحليلات آخر الليل والتقرير الإجمالي
-st.markdown("### 📊 كشف حساب ومصاريف اليوم")
+# 3. عرض المبيعات والمصاريف والإجمالي
+st.markdown("### 📊 السجل والميزانية الحالية")
 
-if not st.session_state.restaurant_db.empty:
-    # حساب الإجمالي
-    total_spent = st.session_state.restaurant_db['المبلغ (ريال)'].sum()
-    st.metric(label="💰 إجمالي المشتريات والمصاريف حتى الآن", value=f"{total_spent:,.2f} ريال")
-    
-    # عرض الجدول المشترك
-    st.markdown("**📄 قائمة المشتريات المسجلة بالتفصيل:**")
-    st.dataframe(st.session_state.restaurant_db, use_container_width=True)
-    
-    # ميزة تحميل التقرير إكسل في آخر الليل
-    csv = st.session_state.restaurant_db.to_csv(index=False).encode('utf-8-sig')
-    st.download_button(
-        label="📥 تحميل كشف الحساب بصيغة Excel/CSV",
-        data=csv,
-        file_name=f"مصاريف_المطعم_{datetime.now().strftime('%Y-%m-%d')}.csv",
-        mime='text/csv',
-        use_container_width=True
-    )
+df_data = load_data()
+
+if not df_data.empty:
+    sales_total = df_data[df_data['النوع'] == 'بيع']['المبلغ (ريال)'].sum()
+    expenses_total = df_data[df_data['النوع'] == 'مصروف']['المبلغ (ريال)'].sum()
+    net_profit = sales_total - expenses_total
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("إجمالي المبيعات 💵", f"{sales_total:,.2f} ريال")
+    col2.metric("إجمالي المصاريف 🛒", f"{expenses_total:,.2f} ريال")
+    col3.metric("الصافي 💰", f"{net_profit:,.2f} ريال")
+
+    st.markdown("**📄 السجل الكامل المحفوظ:**")
+    st.dataframe(df_data, use_container_width=True)
 else:
-    st.info("لا توجد مصاريف مسجلة لليوم حتى الآن. بانتظار إدخالك أو إدخال أخيك!")
+    st.info("لا توجد عمليات مسجلة حتى الآن.")
 
-# زر خروج للأمان
 if st.button("📴 تسجيل الخروج"):
     st.session_state.authenticated = False
     st.rerun()

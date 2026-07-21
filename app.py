@@ -45,7 +45,7 @@ with st.form("expense_form", clear_on_submit=True):
     if submit_btn:
         if item_name and amount > 0:
             now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
-            # إضافة البيانات وتحديد من قام بالإدخال (أنت أم أخوك)
+            # إضافة البيانات وتحديد من قام بالإدخال 
             new_data = pd.DataFrame([[now_str, st.session_state.user, item_name, amount, category]], columns=st.session_state.restaurant_db.columns)
             st.session_state.restaurant_db = pd.concat([new_data, st.session_state.restaurant_db], ignore_index=True)
             st.success(f"تم حفظ '{item_name}' بنجاح بواسطة {st.session_state.user}!")
